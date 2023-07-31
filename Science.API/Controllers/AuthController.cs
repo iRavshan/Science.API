@@ -253,5 +253,7 @@ namespace Science.API.Controllers
                 RefreshToken = refreshToken.Token
             };
         }
+
+        private string Gere
     }
 }
