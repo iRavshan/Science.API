@@ -1,9 +1,11 @@
 ﻿using AutoMapper;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Science.Data.Contexts;
 using Science.Domain.Models;
+using Science.DTO.Auth.Requests;
 using Science.DTO.Auth.Responses;
 using Science.DTO.User.Requests;
 using System.IdentityModel.Tokens.Jwt;
@@ -208,6 +210,31 @@ namespace Science.API.Controllers
             return BadRequest(new { error = "Server error" });
         }
 
+        [HttpPost]
+        [Route("refreshToken")]
+        public async Task<IActionResult> RefreshToken([FromBody] TokenRequest request)
+        {
+            if(ModelState.IsValid)
+            {
+                var result = VerifyAndGenereteToken(request);
+
+                if(result == null)
+                    return BadRequest(new AuthResult()
+                    {
+                        Error = "Invalid tokens",
+                        Result = false
+                    });
+
+                return Ok(result);
+            }
+
+            return BadRequest(new AuthResult()
+            {
+                Error = "Invalid parameters",
+                Result = false
+            });
+        }
+
         private async Task<AuthResult> GenerateJwtToken(User user)
         {
             var jwtTokenHandler = new JwtSecurityTokenHandler();
@@ -222,7 +249,7 @@ namespace Science.API.Controllers
                     new Claim(JwtRegisteredClaimNames.Sub, user.Email),
                     new Claim(JwtRegisteredClaimNames.Email, user.Email),
                     new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
-                    new Claim(JwtRegisteredClaimNames.Iat, DateTime.Now.ToString())
+                    new Claim(JwtRegisteredClaimNames.Iat, DateTime.Now.ToUniversalTime().ToString())
                 }),
 
                 Expires = DateTime.UtcNow.Add(TimeSpan.Parse(configuration.GetSection("JwtConfig:ExpiryTimeFrame").Value)),
@@ -235,7 +262,7 @@ namespace Science.API.Controllers
             RefreshToken refreshToken = new()
             {
                 JwtId = token.Id,
-                Token = "",
+                Token = RandomStringGenerate(23),
                 AddedDate = DateTime.UtcNow,
                 ExpiryDate = DateTime.UtcNow.AddMonths(6),
                 IsRevoked = false,
@@ -254,6 +281,114 @@ namespace Science.API.Controllers
             };
         }
 
-        private string Gere
+        private async Task<AuthResult> VerifyAndGenereteToken(TokenRequest request)
+        {
+            var jwtTokenHandler = new JwtSecurityTokenHandler();
+
+            try
+            {
+                validationParameters.ValidateLifetime = false;
+
+                var tokenVerification = jwtTokenHandler.ValidateToken(request.Token, validationParameters, out var validatedToken);
+            
+                if (validatedToken is JwtSecurityToken jwtSecurityToken)
+                {
+                    var result = jwtSecurityToken.Header.Alg.Equals(SecurityAlgorithms.HmacSha256, StringComparison.InvariantCultureIgnoreCase);
+                    
+                    if(result == false)
+                    {
+                        return null;
+                    }
+                }
+
+                long utcExpiryDate = long.Parse(tokenVerification.Claims.FirstOrDefault(x => x.Type == JwtRegisteredClaimNames.Exp).Value);
+
+                DateTime expiryDateTime = UnixTimeStampToDateTime(utcExpiryDate);
+
+                if(expiryDateTime > DateTime.Now)
+                    return new AuthResult()
+                    {
+                        Result = false,
+                        Error = "Expired token"
+                    };
+
+                var storedToken = await dbContext.RefreshTokens.FirstOrDefaultAsync(x => x.Token == request.RefreshToken);
+
+                if(storedToken == null)
+                    return new AuthResult()
+                    {
+                        Result = false,
+                        Error = "Invalid tokens"
+                    };
+
+                if (storedToken.IsUsed)
+                    return new AuthResult()
+                    {
+                        Result = false,
+                        Error = "Invalid tokens"
+                    };
+
+                if (storedToken.IsRevoked)
+                    return new AuthResult()
+                    {
+                        Result = false,
+                        Error = "Invalid tokens"
+                    };
+
+                var jti = tokenVerification.Claims.FirstOrDefault(x => x.Type == JwtRegisteredClaimNames.Jti).Value;
+
+                if(storedToken.JwtId != jti)
+                    return new AuthResult()
+                    {
+                        Result = false,
+                        Error = "Invalid tokens"
+                    };
+
+                if(storedToken.ExpiryDate < DateTime.UtcNow)
+                    return new AuthResult()
+                    {
+                        Result = false,
+                        Error = "Expired tokens"
+                    };
+
+                storedToken.IsUsed = true;
+
+                dbContext.RefreshTokens.Update(storedToken);
+
+                await dbContext.SaveChangesAsync();
+
+                User dbUser = await userManager.FindByIdAsync(storedToken.UserId);
+
+                return await GenerateJwtToken(dbUser);
+            }
+
+            catch (Exception ex) 
+            {
+                return new AuthResult()
+                {
+                    Result = false,
+                    Error = "Server error"
+                };
+            }
+        }
+
+        private DateTime UnixTimeStampToDateTime(long utcExpiryDate)
+        {
+            DateTime dateTimeVal = new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc);
+
+            dateTimeVal.AddSeconds(utcExpiryDate).ToUniversalTime();  
+
+            return dateTimeVal;
+        }
+
+        private string RandomStringGenerate(int length)
+        {
+            Random random = new Random();
+
+            string chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789abcdefghijklmnopqrstuvwxyz_";
+
+            return new string(Enumerable.Repeat(chars, length).Select(s => s[random.Next(s.Length)]).ToArray());
+        }
+
     }
 }
