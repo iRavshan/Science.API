@@ -9,6 +9,7 @@ using Science.Service.Services;
 using Science.Utility.Configurations;
 using Science.Utility.MappingProfiles;
 using Science.Utility.Middlewares;
+using Serilog;
 using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -57,6 +58,14 @@ builder.Services.AddIdentity<User, IdentityRole>(options => options.SignIn.Requi
     .AddEntityFrameworkStores<AppDbContext>();
 
 builder.Services.AddScoped<ICorrelationIdGenerator, CorrelationIdGenerator>();
+
+
+Log.Logger = new LoggerConfiguration()
+    .MinimumLevel.Debug()
+    .WriteTo.Console()
+    .WriteTo.File("logs/dailyLog-.txt", rollingInterval: RollingInterval.Day)
+    .CreateLogger();
+
 
 var app = builder.Build();
 
