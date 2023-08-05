@@ -8,6 +8,8 @@ using Science.Domain.Models;
 using Science.DTO.Auth.Requests;
 using Science.DTO.Auth.Responses;
 using Science.DTO.User.Requests;
+using Science.Service.Interfaces;
+using Science.Service.Services;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
@@ -22,7 +24,9 @@ namespace Science.API.Controllers
         private readonly RoleManager<IdentityRole> roleManager;
         private readonly TokenValidationParameters validationParameters;
         private readonly AppDbContext dbContext;
+        private readonly ILogger<AuthController> logger;
         private readonly IConfiguration configuration;
+        private readonly ICorrelationIdGenerator correlationIdGenerator;
         private readonly IMapper mapper;
 
         public AuthController(UserManager<User> userManager,
@@ -30,14 +34,18 @@ namespace Science.API.Controllers
                               TokenValidationParameters validationParameters,
                               AppDbContext dbContext,
                               IConfiguration configuration,
+                              ICorrelationIdGenerator correlationIdGenerator,
+                              ILogger<AuthController> logger,
                               IMapper mapper)
         {
             this.userManager = userManager;
             this.roleManager = roleManager;
             this.configuration = configuration;
+            this.correlationIdGenerator = correlationIdGenerator;
             this.mapper = mapper;
             this.validationParameters = validationParameters;
             this.dbContext = dbContext;
+            this.logger = logger;
         }
 
         [HttpPost]
@@ -86,6 +94,8 @@ namespace Science.API.Controllers
         [Route("login")]
         public async Task<IActionResult> Login([FromBody] UserLoginRequest request)
         {
+            logger.LogInformation("CorrelationId {correlationId}: User login request", correlationIdGenerator.Get());
+
             if (ModelState.IsValid)
             {
                 var user_exist = await userManager.FindByEmailAsync(request.Email);

@@ -16,7 +16,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Science.Service\Science.Service.csproj" />
     <ProjectReference Include="..\Science.Utility\Science.Utility.csproj" />
   </ItemGroup>
 

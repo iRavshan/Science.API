@@ -9,11 +9,12 @@
   <ItemGroup>
     <PackageReference Include="AutoMapper" Version="12.0.1" />
     <PackageReference Include="AutoMapper.Extensions.Microsoft.DependencyInjection" Version="12.0.1" />
+    <PackageReference Include="Microsoft.AspNetCore.Http.Abstractions" Version="2.2.0" />
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Science.Domain\Science.Domain.csproj" />
     <ProjectReference Include="..\Science.DTO\Science.DTO.csproj" />
+    <ProjectReference Include="..\Science.Service\Science.Service.csproj" />
   </ItemGroup>
 
 </Project>

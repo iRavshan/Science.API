@@ -1,12 +1,14 @@
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Metadata.Internal;
 using Microsoft.IdentityModel.Tokens;
 using Science.Data.Contexts;
 using Science.Domain.Models;
+using Science.Service.Interfaces;
+using Science.Service.Services;
 using Science.Utility.Configurations;
 using Science.Utility.MappingProfiles;
+using Science.Utility.Middlewares;
 using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -54,6 +56,7 @@ builder.Services.AddSingleton(tokenValidationParameters);
 builder.Services.AddIdentity<User, IdentityRole>(options => options.SignIn.RequireConfirmedAccount = true)
     .AddEntityFrameworkStores<AppDbContext>();
 
+builder.Services.AddScoped<ICorrelationIdGenerator, CorrelationIdGenerator>();
 
 var app = builder.Build();
 
@@ -63,6 +66,8 @@ if (app.Environment.IsDevelopment())
     app.UseSwagger();
     app.UseSwaggerUI();
 }
+
+app.UseMiddleware<CorrelationIdMiddleware>();
 
 app.UseHttpsRedirection();
 
