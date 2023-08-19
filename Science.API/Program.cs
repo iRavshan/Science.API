@@ -54,8 +54,15 @@ builder.Services.AddAuthentication(options => {
 builder.Services.AddSingleton(tokenValidationParameters);
 
 
-builder.Services.AddIdentity<User, IdentityRole>(options => options.SignIn.RequireConfirmedAccount = true)
-    .AddEntityFrameworkStores<AppDbContext>();
+builder.Services.AddIdentity<User, IdentityRole>(options =>
+{
+    options.SignIn.RequireConfirmedAccount = true;
+
+    options.Lockout.AllowedForNewUsers = true;
+    options.Lockout.MaxFailedAccessAttempts = 5;
+    options.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromHours(1);
+
+}).AddEntityFrameworkStores<AppDbContext>();
 
 builder.Services.AddScoped<ICorrelationIdGenerator, CorrelationIdGenerator>();
 

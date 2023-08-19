@@ -106,20 +106,43 @@ namespace Science.API.Controllers
                     });
                 }
 
+                if (user_exist.LockoutEnd > DateTimeOffset.Now)
+                {
+                    return BadRequest(new AuthResult()
+                    {
+                        Result = false,
+                        Error = $"Your account has been blocked until {user_exist.LockoutEnd}"
+                    });
+                }
+
                 bool is_correct = await userManager.CheckPasswordAsync(user_exist, request.Password);
 
-                if (is_correct)
+                if(is_correct) 
                 {
+                    if (user_exist.AccessFailedCount > 0)
+                    {
+                        await userManager.ResetAccessFailedCountAsync(user_exist);
+                    }
+
+                    if(user_exist.LockoutEnd != null)
+                    {
+                        user_exist.LockoutEnd = null;
+
+                        await userManager.UpdateAsync(user_exist);
+                    }
+
                     AuthResult result = await GenerateJwtToken(user_exist);
 
                     return Ok(result);
                 }
                 else
                 {
+                    await userManager.AccessFailedAsync(user_exist);
+
                     return BadRequest(new AuthResult()
                     {
                         Result = false,
-                        Token = "Email or password incorrect"
+                        Error = "Email or password is incorrect"
                     });
                 }
             }
@@ -284,7 +307,8 @@ namespace Science.API.Controllers
             return new AuthResult()
             {
                 Token = jwtToken,
-                RefreshToken = refreshToken.Token
+                RefreshToken = refreshToken.Token,
+                Result = true
             };
         }
 
