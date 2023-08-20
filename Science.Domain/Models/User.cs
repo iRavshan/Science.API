@@ -6,6 +6,6 @@ namespace Science.Domain.Models
     {
         public string Firstname { get; set; } = string.Empty;
         public string Lastname { get; set; } = string.Empty;
-
+        public ICollection<UserAgent> UserAgents { get; set; }
     }
 }

@@ -8,6 +8,9 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="7.0.9" />
+    <PackageReference Include="MyCSharp.HttpUserAgentParser" Version="2.0.3" />
+    <PackageReference Include="MyCSharp.HttpUserAgentParser.AspNetCore" Version="2.0.3" />
+    <PackageReference Include="MyCSharp.HttpUserAgentParser.MemoryCache" Version="2.0.3" />
   </ItemGroup>
 
 </Project>

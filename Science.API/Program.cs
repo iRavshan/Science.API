@@ -2,7 +2,11 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using MyCSharp.HttpUserAgentParser.AspNetCore.DependencyInjection;
+using MyCSharp.HttpUserAgentParser.DependencyInjection;
 using Science.Data.Contexts;
+using Science.Data.Interfaces;
+using Science.Data.Repositories;
 using Science.Domain.Models;
 using Science.Service.Interfaces;
 using Science.Service.Services;
@@ -64,7 +68,13 @@ builder.Services.AddIdentity<User, IdentityRole>(options =>
 
 }).AddEntityFrameworkStores<AppDbContext>();
 
+
+builder.Services.AddScoped<IUserAgentRepository, UserAgentRepository>();
+
 builder.Services.AddScoped<ICorrelationIdGenerator, CorrelationIdGenerator>();
+builder.Services.AddScoped<IUserAgentService, UserAgentService>();
+
+builder.Services.AddHttpUserAgentCachedParser().AddHttpUserAgentParserAccessor();
 
 
 Log.Logger = new LoggerConfiguration()
@@ -84,7 +94,7 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseMiddleware<CorrelationIdMiddleware>();
-app.UseMiddleware<GlobalExceptionHandlerMiddleware>();
+//app.UseMiddleware<GlobalExceptionHandlerMiddleware>();
 
 app.UseHttpsRedirection();
 

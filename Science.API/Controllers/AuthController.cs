@@ -3,6 +3,9 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using Microsoft.Net.Http.Headers;
+using MyCSharp.HttpUserAgentParser;
+using MyCSharp.HttpUserAgentParser.AspNetCore;
 using Science.Data.Contexts;
 using Science.Domain.Models;
 using Science.DTO.Auth.Requests;
@@ -25,6 +28,8 @@ namespace Science.API.Controllers
         private readonly TokenValidationParameters validationParameters;
         private readonly AppDbContext dbContext;
         private readonly IConfiguration configuration;
+        private readonly IUserAgentService userAgentService;
+        private readonly IHttpUserAgentParserAccessor httpUserAgentParserAccessor;
         private readonly ICorrelationIdGenerator correlationIdGenerator;
         private readonly IMapper mapper;
 
@@ -33,12 +38,16 @@ namespace Science.API.Controllers
                               TokenValidationParameters validationParameters,
                               AppDbContext dbContext,
                               IConfiguration configuration,
+                              IUserAgentService userAgentService,
+                              IHttpUserAgentParserAccessor httpUserAgentParserAccessor,
                               ICorrelationIdGenerator correlationIdGenerator,
                               IMapper mapper)
         {
             this.userManager = userManager;
             this.roleManager = roleManager;
             this.configuration = configuration;
+            this.userAgentService = userAgentService;
+            this.httpUserAgentParserAccessor = httpUserAgentParserAccessor;
             this.correlationIdGenerator = correlationIdGenerator;
             this.mapper = mapper;
             this.validationParameters = validationParameters;
@@ -62,12 +71,43 @@ namespace Science.API.Controllers
                     });
                 }
 
+                var username_exist = await userManager.FindByNameAsync(request.UserName);
+
+                if (username_exist != null)
+                {
+                    return BadRequest(new AuthResult()
+                    {
+                        Error = "Username has already registered",
+                        Result = false
+                    });
+                }
+
                 var new_user = mapper.Map<User>(request);
 
                 var is_created = await userManager.CreateAsync(new_user, request.Password);
 
                 if (is_created.Succeeded)
                 {
+                    string userAgent = Request.Headers[HeaderNames.UserAgent].ToString();
+
+                    HttpUserAgentInformation userAgentInfo = HttpUserAgentParser.Parse(userAgent);
+
+                    UserAgent newUserAgent = new UserAgent()
+                    {
+                        UserId = new_user.Id,
+                        Type = userAgentInfo.Type,
+                        PlatformName = userAgentInfo.Platform.GetValueOrDefault().Name,
+                        PlatformType = userAgentInfo.Platform.GetValueOrDefault().PlatformType,
+                        Name = userAgentInfo.Name,
+                        Version = userAgentInfo.Version,
+                        MobileDeviceType = userAgentInfo.MobileDeviceType,
+                        Added_At = DateTime.Now,
+                    };
+
+                    await userAgentService.CreateAsync(newUserAgent);
+
+                    await userAgentService.SaveChangesAsync();
+
                     AuthResult result = await GenerateJwtToken(new_user);
 
                     return Ok(result);
