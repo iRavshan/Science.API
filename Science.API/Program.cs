@@ -69,10 +69,12 @@ builder.Services.AddIdentity<User, IdentityRole>(options =>
 }).AddEntityFrameworkStores<AppDbContext>();
 
 
+builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddScoped<IUserAgentRepository, UserAgentRepository>();
 
 builder.Services.AddScoped<ICorrelationIdGenerator, CorrelationIdGenerator>();
 builder.Services.AddScoped<IUserAgentService, UserAgentService>();
+builder.Services.AddScoped<IUserService, UserService>();
 
 builder.Services.AddHttpUserAgentCachedParser().AddHttpUserAgentParserAccessor();
 
