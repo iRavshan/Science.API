@@ -15,26 +15,18 @@ namespace Science.API.Controllers
             this.roleManager = roleManager;
         }
 
-        [HttpGet]
-        [Route("getAllRoles")]
-        public async Task<IActionResult> GetAllRoles()
-        {
-            List<IdentityRole> roles = await roleManager.Roles.ToListAsync();
-            return Ok(roles);
-        }
-
         [HttpPost]
         [Route("create")]
         public async Task<IActionResult> CreateRole(string name)
         {
-            bool role_exist = await roleManager.RoleExistsAsync(name);
+            bool role_exist = await roleManager.RoleExistsAsync(name.ToLower());
 
             if (role_exist)
             {
                 return BadRequest(new { error = "Role already exist" });
             }
 
-            var roleResult = await roleManager.CreateAsync(new IdentityRole(name));
+            var roleResult = await roleManager.CreateAsync(new IdentityRole(name.ToLower()));
 
             if (roleResult.Succeeded)
             {
@@ -44,44 +36,60 @@ namespace Science.API.Controllers
             return BadRequest(new { error = "Server error" });
         }
 
-        [HttpDelete]
-        [Route("delete")]
-        public async Task<IActionResult> DeleteRole(string name)
+        [HttpGet]
+        [Route("getAll")]
+        public async Task<IActionResult> GetAllRoles()
         {
-            bool role_exist = await roleManager.RoleExistsAsync(name);
-
-            if (!role_exist)
-            {
-                return NotFound(new { error = "Role not found" });
-            }
-
-            var action_result = await roleManager.DeleteAsync(new IdentityRole(name));
-
-            if (action_result.Succeeded)
-            {
-                return Ok(new { result = $"The role {name} has been deleted successfully" });
-            }
-
-            return BadRequest(new { error = "Server error" });
+            List<IdentityRole> roles = await roleManager.Roles.ToListAsync();
+            return Ok(roles);
         }
 
         [HttpPut]
         [Route("update")]
         public async Task<IActionResult> UpdateRoleName(string oldName, string newName)
         {
-            bool role_exist = await roleManager.RoleExistsAsync(oldName);
+            IdentityRole? role = await roleManager.FindByNameAsync(oldName.ToLower());
 
-            if (!role_exist)
+            if (role == null)
             {
                 return NotFound(new { error = $"The role {oldName} not found" });
             }
 
-            //var action_result = await roleManager.UpdateAsync(new IdentityRole(name));
+            if(oldName.ToLower().Equals(newName.ToLower()))
+            {
+                return BadRequest(new { error = "The new name is the same with old name" });
+            }
+            
+            role.Name = newName.ToLower();
+            role.NormalizedName = newName.ToUpper();
 
-            //if (action_result.Succeeded)
-            //{
-            //    return Ok(new { result = $"The role {name} has been deleted successfully" });
-            //}
+            var action_result = await roleManager.UpdateAsync(role);
+
+            if (action_result.Succeeded)
+            {
+                return Ok(new { result = $"The role {oldName} has been updated successfully" });
+            }
+
+            return BadRequest(new { error = "Server error" });
+        }
+
+        [HttpDelete]
+        [Route("delete")]
+        public async Task<IActionResult> DeleteRole(string name)
+        {
+            IdentityRole? role = await roleManager.FindByNameAsync(name.ToLower());
+
+            if (role == null)
+            {
+                return NotFound(new { error = "The role not found" });
+            }
+
+            var action_result = await roleManager.DeleteAsync(role);
+
+            if (action_result.Succeeded)
+            {
+                return Ok(new { result = $"The role {name} has been deleted successfully" });
+            }
 
             return BadRequest(new { error = "Server error" });
         }
