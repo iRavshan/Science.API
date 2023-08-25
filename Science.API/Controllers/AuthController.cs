@@ -6,6 +6,8 @@ using Microsoft.IdentityModel.Tokens;
 using Microsoft.Net.Http.Headers;
 using MyCSharp.HttpUserAgentParser;
 using MyCSharp.HttpUserAgentParser.AspNetCore;
+using RestSharp;
+using RestSharp.Authenticators;
 using Science.Data.Contexts;
 using Science.Domain.Models;
 using Science.DTO.Auth.Requests;
@@ -88,26 +90,31 @@ namespace Science.API.Controllers
 
                 if (is_created.Succeeded)
                 {
+                    //User-Agent REGISTRATION
                     string userAgent = Request.Headers[HeaderNames.UserAgent].ToString();
 
-                    HttpUserAgentInformation userAgentInfo = HttpUserAgentParser.Parse(userAgent);
-
-                    UserAgent newUserAgent = new UserAgent()
-                    {
-                        UserId = new_user.Id,
-                        Type = userAgentInfo.Type,
-                        PlatformName = userAgentInfo.Platform.GetValueOrDefault().Name,
-                        PlatformType = userAgentInfo.Platform.GetValueOrDefault().PlatformType,
-                        Name = userAgentInfo.Name,
-                        Version = userAgentInfo.Version,
-                        MobileDeviceType = userAgentInfo.MobileDeviceType,
-                        Added_At = DateTime.Now,
-                    };
+                    UserAgent newUserAgent = UserAgentParser(userAgent, new_user.Id);
 
                     await userAgentService.CreateAsync(newUserAgent);
 
                     await userAgentService.SaveChangesAsync();
 
+
+                    //EMAIL CONFIRMATION
+                    string code = await userManager.GenerateEmailConfirmationTokenAsync(new_user);
+
+                    string email_body = "Please confirm your email address <a href=\"#URL#\">Click here</a>";
+
+                    string callback_url = Request.Scheme + "://" + Request.Host + Url.Action("ConfirmEmail", "Auth", 
+                                       new { userId = new_user.Id, code = code });
+
+                    string body = email_body.Replace("#URL#", System.Text.Encodings.Web.HtmlEncoder.Default.Encode(callback_url));
+
+                    // SEND EMAIL
+                    //SendEmail(body, new_user.Email);
+
+
+                    //GENERATE JWT 
                     AuthResult result = await GenerateJwtToken(new_user);
 
                     return Ok(result);
@@ -223,19 +230,13 @@ namespace Science.API.Controllers
         {
             var jwtTokenHandler = new JwtSecurityTokenHandler();
 
-            var key = Encoding.UTF8.GetBytes(configuration.GetSection("JwtConfig:Secret").Value);
+            byte[] key = Encoding.UTF8.GetBytes(configuration.GetSection("JwtConfig:Secret").Value);
+
+            var claims = await GetAllValidClaims(user);
 
             var tokenDescriptor = new SecurityTokenDescriptor()
             {
-                Subject = new ClaimsIdentity(new[]
-                {
-                    new Claim("Id", user.Id),
-                    new Claim(JwtRegisteredClaimNames.Sub, user.Email),
-                    new Claim(JwtRegisteredClaimNames.Email, user.Email),
-                    new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
-                    new Claim(JwtRegisteredClaimNames.Iat, DateTime.Now.ToUniversalTime().ToString())
-                }),
-
+                Subject = new ClaimsIdentity(claims),
                 Expires = DateTime.UtcNow.Add(TimeSpan.Parse(configuration.GetSection("JwtConfig:ExpiryTimeFrame").Value)),
                 SigningCredentials = new SigningCredentials(new SymmetricSecurityKey(key), SecurityAlgorithms.HmacSha256),
             };
@@ -357,6 +358,46 @@ namespace Science.API.Controllers
             }
         }
 
+        private async Task<List<Claim>> GetAllValidClaims(User user)
+        {
+            IdentityOptions options = new IdentityOptions();
+
+            List<Claim> claims = new ()
+            {
+                new Claim("Id", user.Id),
+                new Claim(JwtRegisteredClaimNames.Sub, user.Email),
+                new Claim(JwtRegisteredClaimNames.Email, user.Email),
+                new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
+                new Claim(JwtRegisteredClaimNames.Iat, DateTime.Now.ToUniversalTime().ToString())
+            };
+
+            // Getting the claims that we have assigned to the user
+            IList<Claim> userClaims = await userManager.GetClaimsAsync(user);
+            claims.AddRange(userClaims);
+
+            // Get the user role and add it to the claims
+            IList<string> userRoles = await userManager.GetRolesAsync(user);
+
+            foreach(string userRole in userRoles)
+            {
+                IdentityRole? role = await roleManager.FindByNameAsync(userRole);
+
+                if(role != null)
+                {
+                    claims.Add(new Claim(ClaimTypes.Role, userRole));
+
+                    IList<Claim> roleClaims = await roleManager.GetClaimsAsync(role);
+
+                    foreach(Claim roleClaim in roleClaims)
+                    {
+                        claims.Add(roleClaim);
+                    }
+                }
+            }
+
+            return claims;
+        }
+
         private DateTime UnixTimeStampToDateTime(long utcExpiryDate)
         {
             DateTime dateTimeVal = new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc);
@@ -375,5 +416,23 @@ namespace Science.API.Controllers
             return new string(Enumerable.Repeat(chars, length).Select(s => s[random.Next(s.Length)]).ToArray());
         }
 
+        private UserAgent UserAgentParser(string userAgent, string userId)
+        {
+            HttpUserAgentInformation userAgentInfo = HttpUserAgentParser.Parse(userAgent);
+
+            UserAgent newUserAgent = new UserAgent()
+            {
+                UserId = userId,
+                Type = userAgentInfo.Type,
+                PlatformName = userAgentInfo.Platform.GetValueOrDefault().Name,
+                PlatformType = userAgentInfo.Platform.GetValueOrDefault().PlatformType,
+                Name = userAgentInfo.Name,
+                Version = userAgentInfo.Version,
+                MobileDeviceType = userAgentInfo.MobileDeviceType,
+                Added_At = DateTime.Now,
+            };
+
+            return newUserAgent;
+        }
     }
 }
