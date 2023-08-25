@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Science.Domain.Models;
 using Science.Service.Interfaces;
+using System.Security.Claims;
 
 namespace Science.API.Controllers
 {
@@ -90,6 +91,45 @@ namespace Science.API.Controllers
             var roles = await userManager.GetRolesAsync(user);
 
             return Ok(roles);
+        }
+
+        [HttpGet]
+        [Route("getClaims")]
+        public async Task<IActionResult> GetUserClaims(string userId)
+        {
+            User user = await userService.GetByIdAsync(userId);
+
+            if (user == null)
+            {
+                return BadRequest(new { error = "User does not exist" });
+            }
+
+            IList<Claim> userClaims = await userManager.GetClaimsAsync(user);
+
+            return Ok(userClaims);
+        }
+
+        [HttpPost]
+        [Route("addClaims")]
+        public async Task<IActionResult> AddClaimsToUser(string userId, string claimName, string claimValue)
+        {
+            User user = await userService.GetByIdAsync(userId);
+
+            if (user == null)
+            {
+                return BadRequest(new { error = "User does not exist" });
+            }
+
+            Claim userClaim = new Claim(claimName, claimValue);
+
+            IdentityResult result = await userManager.AddClaimAsync(user, userClaim);
+
+            if(result.Succeeded)
+            {
+                return Ok(new { result = $"User has a claim {claimName} added to them" });
+            }
+
+            return BadRequest(new { error = $"Unable to add claim {claimName} to the user " });
         }
 
         [HttpPost]
