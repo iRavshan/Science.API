@@ -10,5 +10,6 @@ namespace Science.Data.Contexts
 
         public DbSet<RefreshToken> RefreshTokens { get; set; }
         public DbSet<UserAgent> UserAgents { get; set; }
+        public DbSet<Book> Books { get; set; }
     }
 }

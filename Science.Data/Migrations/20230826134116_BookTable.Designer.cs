@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Science.Data.Contexts;
 
@@ -11,9 +12,11 @@ using Science.Data.Contexts;
 namespace Science.Data.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20230826134116_BookTable")]
+    partial class BookTable
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -167,21 +170,9 @@ namespace Science.Data.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<string>("ImageUrlLarge")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("ImageUrlMedium")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("ImageUrlSmall")
-                        .HasColumnType("nvarchar(max)");
-
                     b.Property<string>("Title")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
-
-                    b.Property<int>("YearOfPublication")
-                        .HasColumnType("int");
 
                     b.HasKey("Id");
 
